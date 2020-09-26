@@ -1,0 +1,7 @@
+*.zip
+srnn/__pycache__/
+*.pkl
+*.cpkl
+*.log
+*.pyc
+.vscode/
