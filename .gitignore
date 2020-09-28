@@ -5,3 +5,5 @@ srnn/__pycache__/
 *.log
 *.pyc
 .vscode/
+log/
+save/

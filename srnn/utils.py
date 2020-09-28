@@ -111,6 +111,8 @@ class DataLoader:
         # numPeds_data would be a list of lists corresponding to each dataset
         # Ech list would contain the number of pedestrians in each frame in the dataset
         numPeds_data = []
+        # max and min position
+        position_data = []
         # Index of the current dataset
         dataset_index = 0
 
@@ -158,6 +160,8 @@ class DataLoader:
 
             # Add the list of frameIDs to the frameList_data
             frameList_data.append(frameList)
+            #
+            position_data.append([max_position_x, min_position_x, max_position_y, min_position_y])
             # Initialize the list of numPeds for the current dataset
             numPeds_data.append([])
             # Initialize the list of numpy arrays for the current dataset
@@ -185,7 +189,7 @@ class DataLoader:
 
                 # Initialize the row of the numpy array
                 pedsWithPos = []
-                pedsWithPos.append([max_position_x, min_position_x, max_position_y, min_position_y])
+                # pedsWithPos.append([max_position_x, min_position_x, max_position_y, min_position_y])
                 # For each ped in the current frame
                 for ped in pedsList:
                     # Extract their x and y positions
@@ -196,6 +200,8 @@ class DataLoader:
                     )
                     # print('current_type    {}'.format(current_type))
                     # Add their pedID, x, y to the row of the numpy array
+                    # if current_type < 0:
+                    #     continue
                     pedsWithPos.append([ped, current_x, current_y, current_type])
 
                 if (ind > numFrames * self.val_fraction) or (self.infer):
@@ -211,7 +217,7 @@ class DataLoader:
         # Save the tuple (all_frame_data, frameList_data, numPeds_data) in the pickle file
         f = open(data_file, "wb")
         pickle.dump(
-            (all_frame_data, frameList_data, numPeds_data, valid_frame_data),
+            (all_frame_data, frameList_data, numPeds_data, valid_frame_data, position_data),
             f,
             protocol=2,
         )
@@ -232,6 +238,7 @@ class DataLoader:
         self.frameList = self.raw_data[1]
         self.numPedsList = self.raw_data[2]
         self.valid_data = self.raw_data[3]
+        self.position_data = self.raw_data[4]
         counter = 0
         valid_counter = 0
 
@@ -274,6 +281,8 @@ class DataLoader:
         y_batch = []
         # Frame data
         frame_batch = []
+        #
+        position_batch = []
         # Dataset data
         d = []
         # Iteration index
@@ -295,10 +304,12 @@ class DataLoader:
                 seq_target_frame_data = frame_data[idx + 1 : idx + self.seq_length + 1]
                 seq_frame_ids = frame_ids[idx : idx + self.seq_length]
 
+                seq_source_frame_data.append(frame_data[0])
                 # Number of unique peds in this sequence of frames
                 x_batch.append(seq_source_frame_data)
                 y_batch.append(seq_target_frame_data)
                 frame_batch.append(seq_frame_ids)
+                position_batch.append(self.position_data[self.dataset_pointer])
 
                 # advance the frame pointer to a random point
                 if randomUpdate:
@@ -314,7 +325,7 @@ class DataLoader:
                 # Increment the dataset pointer and set the frame_pointer to zero
                 self.tick_batch_pointer(valid=False)
 
-        return x_batch, y_batch, frame_batch, d
+        return x_batch, y_batch, frame_batch, d, position_batch
 
     def next_valid_batch(self, randomUpdate=True):
         """
@@ -324,6 +335,8 @@ class DataLoader:
         x_batch = []
         # Target data
         y_batch = []
+        #
+        position_batch = []
         # Dataset data
         d = []
         # Iteration index
@@ -343,6 +356,7 @@ class DataLoader:
                 # Number of unique peds in this sequence of frames
                 x_batch.append(seq_source_frame_data)
                 y_batch.append(seq_target_frame_data)
+                position_batch.append(self.position_data[self.dataset_pointer])
 
                 # advance the frame pointer to a random point
                 if randomUpdate:
@@ -358,7 +372,7 @@ class DataLoader:
                 # Increment the dataset pointer and set the frame_pointer to zero
                 self.tick_batch_pointer(valid=True)
 
-        return x_batch, y_batch, d
+        return x_batch, y_batch, d, position_batch
 
     def tick_batch_pointer(self, valid=False):
         """
@@ -368,7 +382,7 @@ class DataLoader:
             # Go to the next dataset
             self.dataset_pointer += 1
             # Set the frame pointer to zero for the current dataset
-            self.frame_pointer = 0
+            self.frame_pointer = 1
             # If all datasets are done, then go to the first one again
             if self.dataset_pointer >= len(self.data):
                 self.dataset_pointer = 0
@@ -376,7 +390,7 @@ class DataLoader:
             # Go to the next dataset
             self.valid_dataset_pointer += 1
             # Set the frame pointer to zero for the current dataset
-            self.valid_frame_pointer = 0
+            self.valid_frame_pointer = 1
             # If all datasets are done, then go to the first one again
             if self.valid_dataset_pointer >= len(self.valid_data):
                 self.valid_dataset_pointer = 0
@@ -388,7 +402,7 @@ class DataLoader:
         if not valid:
             # Go to the first frame of the first dataset
             self.dataset_pointer = 0
-            self.frame_pointer = 0
+            self.frame_pointer = 1
         else:
             self.valid_dataset_pointer = 0
-            self.valid_frame_pointer = 0
+            self.valid_frame_pointer = 1

@@ -6,7 +6,7 @@ import warnings
 
 import numpy as np
 import torch
-from IPython import embed
+# from IPython import embed
 from torch.autograd import Variable
 
 from criterion import Gaussian2DLikelihood
@@ -16,6 +16,7 @@ from helper import (
     get_mean_error_separately,
     getCoef,
     sample_gaussian_2d,
+    visulize,
 )
 from model import SRNN
 from st_graph import ST_GRAPH
@@ -38,7 +39,7 @@ def main():
     )
     # Model to be loaded
     parser.add_argument(
-        "--epoch", type=int, default=233, help="Epoch of model to be loaded"
+        "--epoch", type=int, default=129, help="Epoch of model to be loaded"
     )
 
     # Use GPU or not
@@ -50,7 +51,7 @@ def main():
     sample_args = parser.parse_args()
 
     # Save directory
-    save_directory = "../save/"
+    save_directory = "save/"
     # Define the path for the config file for saved args
     with open(os.path.join(save_directory, "config.pkl"), "rb") as f:
         saved_args = pickle.load(f)
@@ -65,7 +66,7 @@ def main():
     )
 
     if os.path.isfile(checkpoint_path):
-        print("Loading checkpoint")
+        print("Loading checkpoint: [%s]"%checkpoint_path)
         checkpoint = torch.load(checkpoint_path)
         # model_iteration = checkpoint['iteration']
         model_epoch = checkpoint["epoch"]
@@ -97,7 +98,7 @@ def main():
         start = time.time()
 
         # Get the next batch
-        x, _, frameIDs, d = dataloader.next_batch(randomUpdate=False)
+        x, _, frameIDs, d, position = dataloader.next_batch(randomUpdate=False)
 
         # Construct ST graph
         stgraph.readGraph(x)
@@ -132,6 +133,9 @@ def main():
             nodesPresent,
         )
 
+        visulize(ret_nodes.detach().cpu().numpy(), nodes.detach().cpu().numpy(), nodesPresent)
+
+
         # Compute mean and final displacement error
         """
         total_error += get_mean_error(
@@ -148,9 +152,16 @@ def main():
             nodesPresent[sample_args.obs_length :],
         )
         """
+        position = position[0]
+        outputs = ret_nodes[sample_args.obs_length :].data
+        targets = nodes[sample_args.obs_length :].data
+        outputs[:,:,0] = (outputs[:,:,0] + 1) / 2 * (position[0] - position[1]) + position[1]
+        outputs[:,:,1] = (outputs[:,:,1] + 1) / 2 * (position[2] - position[3]) + position[3]
+        targets[:,:,0] = (targets[:,:,0] + 1) / 2 * (position[0] - position[1]) + position[1]
+        targets[:,:,1] = (targets[:,:,1] + 1) / 2 * (position[2] - position[3]) + position[3]
         avg_ped_error_delta, avg_bic_error_delta, avg_car_error_delta = get_mean_error_separately(
-            ret_nodes[sample_args.obs_length :].data,
-            nodes[sample_args.obs_length :].data,
+            outputs,
+            targets,
             nodesPresent[sample_args.obs_length - 1],
             nodesPresent[sample_args.obs_length :],
             saved_args.use_cuda,
@@ -160,8 +171,8 @@ def main():
         avg_car_error += avg_car_error_delta
 
         final_ped_error_delta, final_bic_error_delta, final_car_error_delta = get_final_error_separately(
-            ret_nodes[sample_args.obs_length :].data,
-            nodes[sample_args.obs_length :].data,
+            outputs,
+            targets,
             nodesPresent[sample_args.obs_length - 1],
             nodesPresent[sample_args.obs_length :],
         )

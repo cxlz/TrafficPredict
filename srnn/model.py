@@ -791,11 +791,17 @@ class SRNN(nn.Module):
                         - weighted_supernode_f_u_ped
                     )
 
+                    list_of_super_edge_ped = torch.tensor(0)
+                    list_of_super_node_ped = torch.tensor(0)
+                    if self.use_cuda:
+                        list_of_super_edge_ped = list_of_super_edge_ped.cuda()
+                        list_of_super_node_ped = list_of_super_node_ped.cuda() 
+
                     ped_hidden_states_super_node_Edge_RNNs = torch.index_select(
-                        hidden_states_super_node_Edge_RNNs, 0, torch.tensor(0)
+                        hidden_states_super_node_Edge_RNNs, 0, list_of_super_edge_ped
                     )
                     ped_cell_states_super_node_Edge_RNNs = torch.index_select(
-                        cell_states_super_node_Edge_RNNs, 0, torch.tensor(0)
+                        cell_states_super_node_Edge_RNNs, 0, list_of_super_edge_ped
                     )
                     if self.use_cuda:
                         ped_hidden_states_super_node_Edge_RNNs = ped_hidden_states_super_node_Edge_RNNs.cuda()
@@ -811,11 +817,12 @@ class SRNN(nn.Module):
 
                     weighted_supernode_f_u_ped = weighted_supernode_f_u_ped_next_time
 
+
                     ped_hidden_states_super_node_RNNs = torch.index_select(
-                        hidden_states_super_node_RNNs, 0, torch.tensor(0)
+                        hidden_states_super_node_RNNs, 0, list_of_super_node_ped
                     )
                     ped_cell_states_super_node_RNNs = torch.index_select(
-                        cell_states_super_node_RNNs, 0, torch.tensor(0)
+                        cell_states_super_node_RNNs, 0, list_of_super_node_ped
                     )
                     if self.use_cuda:
                         ped_hidden_states_super_node_RNNs = ped_hidden_states_super_node_RNNs.cuda()
@@ -858,12 +865,17 @@ class SRNN(nn.Module):
                         weighted_supernode_f_u_byc_next_time
                         - weighted_supernode_f_u_byc
                     )
+                    list_of_super_edge_byc = torch.tensor(1)
+                    list_of_super_node_byc = torch.tensor(1)
+                    if self.use_cuda:
+                        list_of_super_edge_byc = list_of_super_edge_byc.cuda()
+                        list_of_super_node_byc = list_of_super_node_byc.cuda()
 
                     byc_hidden_states_super_node_Edge_RNNs = torch.index_select(
-                        hidden_states_super_node_Edge_RNNs, 0, torch.tensor(1)
+                        hidden_states_super_node_Edge_RNNs, 0, list_of_super_edge_byc
                     )
                     byc_cell_states_super_node_Edge_RNNs = torch.index_select(
-                        cell_states_super_node_Edge_RNNs, 0, torch.tensor(1)
+                        cell_states_super_node_Edge_RNNs, 0, list_of_super_edge_byc
                     )
                     if self.use_cuda:
                         byc_hidden_states_super_node_Edge_RNNs = byc_hidden_states_super_node_Edge_RNNs.cuda()
@@ -881,10 +893,10 @@ class SRNN(nn.Module):
                     weighted_supernode_f_u_byc = weighted_supernode_f_u_byc_next_time
 
                     byc_hidden_states_super_node_RNNs = torch.index_select(
-                        hidden_states_super_node_RNNs, 0, torch.tensor(1)
+                        hidden_states_super_node_RNNs, 0, list_of_super_node_byc
                     )
                     byc_cell_states_super_node_RNNs = torch.index_select(
-                        cell_states_super_node_RNNs, 0, torch.tensor(1)
+                        cell_states_super_node_RNNs, 0, list_of_super_node_byc
                     )
                     if self.use_cuda:
                         byc_hidden_states_super_node_RNNs = byc_hidden_states_super_node_RNNs.cuda()
@@ -928,12 +940,17 @@ class SRNN(nn.Module):
                         weighted_supernode_f_u_car_next_time
                         - weighted_supernode_f_u_car
                     )
-
+                    list_of_super_edge_car = torch.tensor(2)
+                    list_of_super_node_car = torch.tensor(2)
+                    if self.use_cuda:
+                        list_of_super_edge_car = list_of_super_edge_car.cuda()
+                        list_of_super_node_car = list_of_super_node_car.cuda()
+                        
                     car_hidden_states_super_node_Edge_RNNs = torch.index_select(
-                        hidden_states_super_node_Edge_RNNs, 0, torch.tensor(2)
+                        hidden_states_super_node_Edge_RNNs, 0, list_of_super_node_car
                     )
                     car_cell_states_super_node_Edge_RNNs = torch.index_select(
-                        cell_states_super_node_Edge_RNNs, 0, torch.tensor(2)
+                        cell_states_super_node_Edge_RNNs, 0, list_of_super_node_car
                     )
                     if self.use_cuda:
                         car_hidden_states_super_node_Edge_RNNs = car_hidden_states_super_node_Edge_RNNs.cuda()
@@ -949,10 +966,10 @@ class SRNN(nn.Module):
                     weighted_supernode_f_u_car = weighted_supernode_f_u_car_next_time
 
                     car_hidden_states_super_node_RNNs = torch.index_select(
-                        hidden_states_super_node_RNNs, 0, torch.tensor(2)
+                        hidden_states_super_node_RNNs, 0, list_of_super_node_car
                     )
                     car_cell_states_super_node_RNNs = torch.index_select(
-                        cell_states_super_node_RNNs, 0, torch.tensor(2)
+                        cell_states_super_node_RNNs, 0, list_of_super_node_car
                     )
                     if self.use_cuda:
                         car_hidden_states_super_node_RNNs = car_hidden_states_super_node_RNNs.cuda()

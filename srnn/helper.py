@@ -1,4 +1,5 @@
 import numpy as np
+import cv2
 import torch
 from torch.autograd import Variable
 
@@ -494,3 +495,49 @@ def sample_gaussian_2d_train(mux, muy, sx, sy, corr, nodesPresent):
         next_y[node] = next_values[0][1]
 
     return next_x, next_y
+
+
+def visulize(outputs, targets, nodesPresent):
+    img = np.ones((512, 512, 3), dtype="float")
+    # max_x = float("-inf")
+    # max_y = float("-inf")
+    # min_x = float("inf")
+    # min_y = float("inf")
+    # for i in range(targets.shape[0]):
+    #     for j in range(targets.shape[1]):
+    #         max_x = max(max_x, targets[i,j,0])
+    #         min_x = min(min_x, targets[i,j,0])
+    #         max_y = max(max_y, targets[i,j,1])
+    #         min_y = min(min_y, targets[i,j,1])
+    # outputs[:,:,0] = (outputs[:,:,0] - min_x) / (max_x - min_x)
+    # targets[:,:,0] = (targets[:,:,0] - min_x) / (max_x - min_x)
+    # outputs[:,:,1] = (outputs[:,:,1] - min_y) / (max_y - min_y)
+    # targets[:,:,1] = (targets[:,:,1] - min_y) / (max_y - min_y)
+    outputs = ((outputs + 1) * 256).astype("int") 
+    targets = ((targets + 1) * 256).astype("int") 
+    # for framenum in range(len(nodesPresent)):
+    #     for nodenum, nodetype in nodesPresent[framenum]:
+
+    for nodenum in range(targets.shape[1]):
+        nodepos = []
+        predpos = []
+        for framenum in range(targets.shape[0]):
+            for num, ntype in nodesPresent[framenum]:
+                if num == nodenum:
+                    nodepos.append(targets[framenum, nodenum, :])
+                    predpos.append(outputs[framenum, nodenum, :2])
+                    nodetype = ntype
+        if len(nodepos) <= 1:
+            continue
+        color = [0, 0, 0]
+        color[int(nodetype) - 1] = 255
+        # img = cv2.putText(img, str(int(nodetype)), tuple(nodepos[1] + 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,0,0))
+        img = cv2.circle(img, tuple(nodepos[1]), 5, color, thickness= -1)
+        img = cv2.circle(img, tuple(predpos[1]), 3, color, thickness= 2)
+        for i in range(2, len(nodepos)):
+            cv2.line(img, tuple(nodepos[i - 1]), tuple(nodepos[i]), (0,0,255), thickness=2)
+            cv2.line(img, tuple(predpos[i - 1]), tuple(predpos[i]), (255,0,0), thickness=2)
+            # img = cv2.circle(img, tuple(nodepos[i]), 3, (0,0,255), thickness= -1)
+            # img = cv2.circle(img, tuple(predpos[i]), 3, (255,0,0), thickness= 2)
+        cv2.imshow("img", img)
+        cv2.waitKey(1)

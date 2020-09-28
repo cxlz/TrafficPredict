@@ -19,6 +19,14 @@ from criterion import Gaussian2DLikelihood
 from model import SRNN
 from st_graph import ST_GRAPH
 from utils import DataLoader, set_logger
+from helper import (
+    compute_edges,
+    get_final_error_separately,
+    get_mean_error_separately,
+    getCoef,
+    sample_gaussian_2d,
+    visulize,
+)
 
 os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
 
@@ -150,18 +158,20 @@ def visulize(outputs, targets, nodesPresent):
                     nodepos.append(targets[framenum, nodenum, :])
                     predpos.append(outputs[framenum, nodenum, :2])
                     nodetype = ntype
-                    color = [0, 0, 0]
-                    color[int(nodetype) - 1] = 255
-        if len(nodepos) == 0:
+        if len(nodepos) <= 1:
             continue
-        img = cv2.putText(img, str(int(nodetype)), tuple(nodepos[0] + 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,0,0))
-        img = cv2.circle(img, tuple(nodepos[0]), 3, (0,0,0), thickness= -1)
-        img = cv2.circle(img, tuple(predpos[0]), 3, (0,0,0), thickness= 2)
-        for i in range(1, len(nodepos)):
-            img = cv2.circle(img, tuple(nodepos[i]), 3, (0,0,255), thickness= -1)
-            img = cv2.circle(img, tuple(predpos[i]), 3, (255,0,0), thickness= 2)
+        color = [0, 0, 0]
+        color[int(nodetype) - 1] = 255
+        # img = cv2.putText(img, str(int(nodetype)), tuple(nodepos[1] + 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,0,0))
+        img = cv2.circle(img, tuple(nodepos[1]), 5, color, thickness= -1)
+        img = cv2.circle(img, tuple(predpos[1]), 3, color, thickness= 2)
+        for i in range(2, len(nodepos)):
+            cv2.line(img, tuple(nodepos[i - 1]), tuple(nodepos[i]), (0,0,255), thickness=2)
+            cv2.line(img, tuple(predpos[i - 1]), tuple(predpos[i]), (255,0,0), thickness=2)
+            # img = cv2.circle(img, tuple(nodepos[i]), 3, (0,0,255), thickness= -1)
+            # img = cv2.circle(img, tuple(predpos[i]), 3, (255,0,0), thickness= 2)
         cv2.imshow("img", img)
-        cv2.waitKey(0)
+        cv2.waitKey(1)
 
 
 
@@ -187,10 +197,11 @@ def train(args):
 
     # Path to store the checkpoint file
     def checkpoint_path(x):
-        return os.path.join(save_directory, "srnn_model_" + str(x) + ".tar")
+        return os.path.join("/home/cowa/data_server/cxl/TrafficPredict/save", "srnn_model_" + str(x) + ".tar")
 
-    load_model_path = "/data/cxl/TrafficPredict/save/srnn_model_129.tar"
+    load_model_path = "save/srnn_model_129.tar"
     # Initialize net
+    print("loading checkpoint [%s]"%load_model_path)
     load_model = torch.load(load_model_path, map_location=torch.device('cpu'))
     net = SRNN(args)
     net.load_state_dict(load_model["state_dict"])
@@ -214,11 +225,17 @@ def train(args):
         for batch in range(dataloader.num_batches):
             start = time.time()
             # Get batch data
-            x, _, _, d = dataloader.next_batch(randomUpdate=True)
+            x, _, _, d, positions = dataloader.next_batch(randomUpdate=True)
 
             # Loss for this batch
             loss_batch = 0
 
+            avg_ped_error = 0.0
+            avg_bic_error = 0.0
+            avg_car_error = 0.0
+            final_ped_error = 0.0
+            final_bic_error = 0.0
+            final_car_error = 0.0
             # For each sequence in the batch
             for sequence in range(dataloader.batch_size):
                 # Construct the graph for the current sequence
@@ -326,11 +343,45 @@ def train(args):
 
                 # Reset the stgraph
                 stgraph.reset()
-
                 # prediction visulization
                 visulize(outputs.detach().cpu().numpy(), nodes[1:].detach().cpu().numpy(), nodesPresent[1:])
 
+                position = positions[sequence]
+                out = outputs[:,:,:2].detach().data
+                tar = nodes[1:].detach().data
+                # out[:,:,0] = (out[:,:,0] + 1) / 2 * (position[0] - position[1]) + position[1]
+                # out[:,:,1] = (out[:,:,1] + 1) / 2 * (position[2] - position[3]) + position[3]
+                # tar[:,:,0] = (tar[:,:,0] + 1) / 2 * (position[0] - position[1]) + position[1]
+                # tar[:,:,1] = (tar[:,:,1] + 1) / 2 * (position[2] - position[3]) + position[3]
+                avg_ped_error_delta, avg_bic_error_delta, avg_car_error_delta = get_mean_error_separately(
+                    out,
+                    tar,
+                    nodesPresent[0],
+                    nodesPresent[1:],
+                    args.use_cuda,
+                )
+                avg_ped_error += avg_ped_error_delta
+                avg_bic_error += avg_bic_error_delta
+                avg_car_error += avg_car_error_delta
+
+                final_ped_error_delta, final_bic_error_delta, final_car_error_delta = get_final_error_separately(
+                    out,
+                    tar,
+                    nodesPresent[0],
+                    nodesPresent[1:],
+                )
+                final_ped_error += final_ped_error_delta
+                final_bic_error += final_bic_error_delta
+                final_car_error += final_car_error_delta
+
+
             end = time.time()
+            avg_ped_error /= dataloader.batch_size
+            avg_bic_error /= dataloader.batch_size
+            avg_car_error /= dataloader.batch_size
+            final_ped_error /= dataloader.batch_size
+            final_bic_error /= dataloader.batch_size
+            final_car_error /= dataloader.batch_size
             loss_batch = loss_batch / dataloader.batch_size
             loss_epoch += loss_batch
 
@@ -343,6 +394,23 @@ def train(args):
                     end - start,
                 )
             )
+            print(
+                "AVG disp error:     pedestrian: {}       bicycle: {}        car:{}".format(
+                    avg_ped_error,
+                    avg_bic_error,
+                    avg_car_error,
+                )
+            )
+
+
+            print(
+                "Final disp error:   pedestrian: {}       bicycle: {}        car:{}".format(
+                    final_ped_error,
+                    final_bic_error,
+                    final_car_error,
+                )
+            )
+
         # Compute loss for the entire epoch
         loss_epoch /= dataloader.num_batches
         # Log it
@@ -355,7 +423,7 @@ def train(args):
         for batch in range(dataloader.valid_num_batches):
             # Get batch data
 
-            x, _, d = dataloader.next_valid_batch(randomUpdate=False)
+            x, _, d, position = dataloader.next_valid_batch(randomUpdate=False)
 
             # Loss for this batch
             loss_batch = 0
