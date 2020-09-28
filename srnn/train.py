@@ -1,8 +1,16 @@
+import sys
+try:
+    sys.path.remove("/opt/ros/kinetic/lib/python2.7/dist-packages")
+except:
+    pass
 import argparse
 import logging
 import os
 import pickle
 import time
+
+import cv2
+import numpy as np
 
 import torch
 from torch.autograd import Variable
@@ -104,12 +112,57 @@ def main():
 
     # Use GPU or CPU
     parser.add_argument(
-        "--use_cuda", action="store_true", default=True, help="Use GPU or CPU"
+        "--use_cuda", action="store_true", default=False, help="Use GPU or CPU"
     )
 
     args = parser.parse_args()
 
     train(args)
+
+
+def visulize(outputs, targets, nodesPresent):
+    img = np.ones((512, 512, 3), dtype="float")
+    # max_x = float("-inf")
+    # max_y = float("-inf")
+    # min_x = float("inf")
+    # min_y = float("inf")
+    # for i in range(targets.shape[0]):
+    #     for j in range(targets.shape[1]):
+    #         max_x = max(max_x, targets[i,j,0])
+    #         min_x = min(min_x, targets[i,j,0])
+    #         max_y = max(max_y, targets[i,j,1])
+    #         min_y = min(min_y, targets[i,j,1])
+    # outputs[:,:,0] = (outputs[:,:,0] - min_x) / (max_x - min_x)
+    # targets[:,:,0] = (targets[:,:,0] - min_x) / (max_x - min_x)
+    # outputs[:,:,1] = (outputs[:,:,1] - min_y) / (max_y - min_y)
+    # targets[:,:,1] = (targets[:,:,1] - min_y) / (max_y - min_y)
+    outputs = ((outputs + 1) * 256).astype("int") 
+    targets = ((targets + 1) * 256).astype("int") 
+    # for framenum in range(len(nodesPresent)):
+    #     for nodenum, nodetype in nodesPresent[framenum]:
+
+    for nodenum in range(targets.shape[1]):
+        nodepos = []
+        predpos = []
+        for framenum in range(targets.shape[0]):
+            for num, ntype in nodesPresent[framenum]:
+                if num == nodenum:
+                    nodepos.append(targets[framenum, nodenum, :])
+                    predpos.append(outputs[framenum, nodenum, :2])
+                    nodetype = ntype
+                    color = [0, 0, 0]
+                    color[int(nodetype) - 1] = 255
+        if len(nodepos) == 0:
+            continue
+        img = cv2.putText(img, str(int(nodetype)), tuple(nodepos[0] + 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,0,0))
+        img = cv2.circle(img, tuple(nodepos[0]), 3, (0,0,0), thickness= -1)
+        img = cv2.circle(img, tuple(predpos[0]), 3, (0,0,0), thickness= 2)
+        for i in range(1, len(nodepos)):
+            img = cv2.circle(img, tuple(nodepos[i]), 3, (0,0,255), thickness= -1)
+            img = cv2.circle(img, tuple(predpos[i]), 3, (255,0,0), thickness= 2)
+        cv2.imshow("img", img)
+        cv2.waitKey(0)
+
 
 
 def train(args):
@@ -119,14 +172,14 @@ def train(args):
     stgraph = ST_GRAPH(1, args.seq_length + 1)
 
     # Log directory
-    log_directory = "../log/"
+    log_directory = "log/"
 
     # Logging file
     log_file_curve = open(os.path.join(log_directory, "log_curve.txt"), "w")
     log_file = open(os.path.join(log_directory, "val.txt"), "w")
 
     # Save directory
-    save_directory = "../save/"
+    save_directory = "save/"
 
     # Open the configuration file
     with open(os.path.join(save_directory, "config.pkl"), "wb") as f:
@@ -136,12 +189,16 @@ def train(args):
     def checkpoint_path(x):
         return os.path.join(save_directory, "srnn_model_" + str(x) + ".tar")
 
+    load_model_path = "/data/cxl/TrafficPredict/save/srnn_model_129.tar"
     # Initialize net
+    load_model = torch.load(load_model_path, map_location=torch.device('cpu'))
     net = SRNN(args)
+    net.load_state_dict(load_model["state_dict"])
     if args.use_cuda:
         net = net.cuda()
 
     optimizer = torch.optim.Adam(net.parameters(), weight_decay=1e-5)
+    optimizer.load_state_dict(load_model["optimizer_state_dict"])
 
     # learning_rate = args.learning_rate
     logging.info("Training begin")
@@ -166,6 +223,8 @@ def train(args):
             for sequence in range(dataloader.batch_size):
                 # Construct the graph for the current sequence
                 stgraph.readGraph([x[sequence]])
+                # nodes: (seq_length, num of ped, 2), position of node
+                # edges: (seq_length, num of ped ** 2, 2), vector of edge
                 nodes, edges, nodesPresent, edgesPresent = stgraph.getSequence()
                 # Convert to cuda variables
                 nodes = Variable(torch.from_numpy(nodes).float())
@@ -267,6 +326,9 @@ def train(args):
 
                 # Reset the stgraph
                 stgraph.reset()
+
+                # prediction visulization
+                visulize(outputs.detach().cpu().numpy(), nodes[1:].detach().cpu().numpy(), nodesPresent[1:])
 
             end = time.time()
             loss_batch = loss_batch / dataloader.batch_size
@@ -383,7 +445,7 @@ def train(args):
                 loss = Gaussian2DLikelihood(
                     outputs, nodes[1:], nodesPresent[1:], args.pred_length
                 )
-
+                
                 loss_batch += loss.item()
 
                 # Reset the stgraph

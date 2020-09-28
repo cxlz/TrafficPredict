@@ -49,7 +49,7 @@ class DataLoader:
         random.seed(42)
         np.random.seed(42)
         # List of data directories where raw data resides
-        self.data_dirs = "../data/prediction_train/"
+        self.data_dirs = "data/prediction_train/"
         self.dataset_cnt = len(os.listdir(self.data_dirs))
         self.dataset_idx = sorted(os.listdir(self.data_dirs))
         np.random.shuffle(self.dataset_idx)
@@ -62,9 +62,9 @@ class DataLoader:
         self.batch_size = batch_size
         self.seq_length = seq_length
 
-        data_file = os.path.join("../data/", "trajectories.cpkl")
+        data_file = os.path.join("data/", "trajectories.cpkl")
         if infer == True:
-            data_file = os.path.join("../data/", "test_trajectories.cpkl")
+            data_file = os.path.join("data/", "test_trajectories.cpkl")
 
         self.val_fraction = 0.2
 
@@ -114,27 +114,27 @@ class DataLoader:
         # Index of the current dataset
         dataset_index = 0
 
-        min_position_x = 1000
-        max_position_x = -1000
-        min_position_y = 1000
-        max_position_y = -1000
 
         for ind_directory, directory in enumerate(data_dirs):
-            file_path = os.path.join("../data/prediction_train/", directory)
+            file_path = os.path.join("data/prediction_train/", directory)
+            data = np.genfromtxt(file_path, delimiter=" ")
+        # For each dataset
+        for ind_directory, directory in enumerate(data_dirs):
+            # define path of the csv file of the current dataset
+            # file_path = os.path.join(directory, 'pixel_pos.csv')
+            min_position_x = float("inf")
+            max_position_x = float("-inf")
+            min_position_y = float("inf")
+            max_position_y = float("-inf")
+
+            file_path = os.path.join("data/prediction_train/", directory)
+
+            # Load the data from the csv file
             data = np.genfromtxt(file_path, delimiter=" ")
             min_position_x = min(min_position_x, min(data[:, 3]))
             max_position_x = max(max_position_x, max(data[:, 3]))
             min_position_y = min(min_position_y, min(data[:, 4]))
             max_position_y = max(max_position_y, max(data[:, 4]))
-        # For each dataset
-        for ind_directory, directory in enumerate(data_dirs):
-            # define path of the csv file of the current dataset
-            # file_path = os.path.join(directory, 'pixel_pos.csv')
-
-            file_path = os.path.join("../data/prediction_train/", directory)
-
-            # Load the data from the csv file
-            data = np.genfromtxt(file_path, delimiter=" ")
             """
             data[:, 3] = (
                 (data[:, 3] - min(data[:, 3])) / (max(data[:, 3]) - min(data[:, 3]))
@@ -185,6 +185,7 @@ class DataLoader:
 
                 # Initialize the row of the numpy array
                 pedsWithPos = []
+                pedsWithPos.append([max_position_x, min_position_x, max_position_y, min_position_y])
                 # For each ped in the current frame
                 for ped in pedsList:
                     # Extract their x and y positions
@@ -239,16 +240,16 @@ class DataLoader:
             # get the frame data for the current dataset
             all_frame_data = self.data[dataset]
             valid_frame_data = self.valid_data[dataset]
-            print(
-                "Training data from dataset {} : {}".format(
-                    dataset, len(all_frame_data)
-                )
-            )
-            print(
-                "Validation data from dataset {} : {}".format(
-                    dataset, len(valid_frame_data)
-                )
-            )
+            # print(
+            #     "Training data from dataset {} : {}".format(
+            #         dataset, len(all_frame_data)
+            #     )
+            # )
+            # print(
+            #     "Validation data from dataset {} : {}".format(
+            #         dataset, len(valid_frame_data)
+            #     )
+            # )
             # Increment the counter with the number of sequences in the current dataset
             counter += int(len(all_frame_data) / (self.seq_length))
             valid_counter += int(len(valid_frame_data) / (self.seq_length))

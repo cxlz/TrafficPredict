@@ -140,7 +140,7 @@ class ST_GRAPH:
         nodes = self.nodes[0]
         edges = self.edges[0]
 
-        numNodes = len(nodes.keys())
+        numNodes = len(nodes.keys()) #num of peds in frame
         # print("********************* numNodes {}***********".format(numNodes))
         list_of_nodes = {}
 

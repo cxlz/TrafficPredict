@@ -2,7 +2,6 @@
 srnn/__pycache__/
 *.pkl
 *.cpkl
-log/
 *.log
 *.pyc
 .vscode/
